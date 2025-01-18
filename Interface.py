@@ -1,38 +1,35 @@
-import serial
-import numpy as np
-
 import matplotlib.pyplot as plt
+import numpy as np
+import serial
 
 # Set up the serial connection
-ser = serial.Serial('COM3', 1000000)  # Change 'COM3' to your Arduino's serial port
+ser = serial.Serial('COM3', 9600)
 
-# Set up the plot
+# Initialize the plot
+plt.ion()
 fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
-ax.set_ylim(0, 100)  # Adjust the range according to your sensor's range
-
-# Initialize an array to store the distances
-angles = np.arange(0, 360, 5)
+angles = np.deg2rad(np.arange(0, 360, 5))  # Convert angles to radians
 distances = np.zeros_like(angles)
+sc = ax.scatter(angles, distances)
 
-# Function to update the plot
-def update_plot(angle, distance):
-    index = angle // 5
-    distances[index] = distance
-    ax.clear()
-    ax.set_ylim(0, 100)
-    ax.plot(np.deg2rad(angles), distances, 'bo')
-    plt.draw()
-    plt.pause(0.01)
+ax.set_ylim(0, 200)  # Adjust based on expected distance range
 
-# Read and plot the data
-try:
-    while True:
-        line = ser.readline().decode('ascii').strip()
-        if line:
-            angle, distance = map(int, line.split())
-            update_plot(angle, distance)
-except KeyboardInterrupt:
-    pass
-finally:
-    ser.close()
-    plt.show()
+current_angle_index = 0
+
+while True:
+    try:
+        if ser.in_waiting > 0:
+            data = ser.readline().decode('ascii').strip()
+            print(data)
+            if data.isdigit():
+                distance = int(data)
+                distances[current_angle_index] = distance
+                current_angle_index = (current_angle_index + 1) % len(angles)
+
+            sc.set_offsets(np.c_[angles, distances])
+            fig.canvas.draw_idle()
+            plt.pause(0.01)
+    except KeyboardInterrupt:
+        break
+
+ser.close()
